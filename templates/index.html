@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ModelEquiv — Semantic Correspondence for Ecore Meta-Models</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #0c0e13;
+            --surface: #13151c;
+            --card: #1a1d27;
+            --border: #282c3a;
+            --border-focus: #4a6cf7;
+            --text: #e2e4eb;
+            --text-dim: #7a7f96;
+            --accent: #4a6cf7;
+            --accent-glow: rgba(74, 108, 247, 0.15);
+            --green: #34d399;
+            --green-dim: rgba(52, 211, 153, 0.12);
+            --red: #f87171;
+            --red-dim: rgba(248, 113, 113, 0.12);
+            --amber: #fbbf24;
+            --amber-dim: rgba(251, 191, 36, 0.1);
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'DM Sans', system-ui, sans-serif;
+            --radius: 10px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--sans);
+            background: var(--ink);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.55;
+        }
+
+        /* ---- Noise texture overlay ---- */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .shell {
+            position: relative;
+            z-index: 1;
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem 4rem;
+        }
+
+        /* ---- Header ---- */
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: #fff;
+        }
+        header h1 span {
+            background: linear-gradient(135deg, var(--accent), #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        header p {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            margin-top: 0.4rem;
+        }
+
+        /* ---- Pipeline pill bar ---- */
+        .pipeline {
+            display: flex;
+            justify-content: center;
+            gap: 0.35rem;
+            margin-bottom: 2.5rem;
+            flex-wrap: wrap;
+        }
+        .pipeline .step {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+        .pipeline .step .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent);
+            flex-shrink: 0;
+        }
+        .pipeline .arrow { color: var(--border); font-size: 0.7rem; }
+
+        /* ---- Tabs ---- */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .tabs button {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-family: var(--sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 0.65rem 1.3rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tabs button:hover { color: var(--text); }
+        .tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ---- Card ---- */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        /* ---- Input panels ---- */
+        .pair-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 640px) { .pair-grid { grid-template-columns: 1fr; } }
+
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        textarea {
+            width: 100%;
+            height: 230px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            padding: 0.85rem;
+            resize: vertical;
+            transition: border-color 0.2s;
+            line-height: 1.6;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        textarea::placeholder { color: #444a5e; }
+
+        /* Single query input */
+        .search-row {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .search-row textarea {
+            height: 120px;
+            flex: 1;
+        }
+
+        /* ---- Buttons ---- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            font-family: var(--sans);
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 0.7rem 1.4rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            width: 100%;
+            margin-top: 1.1rem;
+        }
+        .btn:hover { background: #3b5de7; transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn svg { width: 16px; height: 16px; }
+
+        /* ---- Results area ---- */
+        .results { margin-top: 1.5rem; }
+
+        /* Verdict banner */
+        .verdict {
+            border-radius: var(--radius);
+            padding: 1.3rem 1.5rem;
+            border-left: 4px solid;
+            animation: fadeSlide 0.35s ease-out;
+        }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .verdict.high     { background: var(--green-dim); border-color: var(--green); }
+        .verdict.medium   { background: var(--amber-dim); border-color: var(--amber); }
+        .verdict.low      { background: var(--red-dim); border-color: var(--red); }
+        .verdict.unknown  { background: var(--amber-dim); border-color: var(--amber); }
+
+        .verdict-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .verdict-label {
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .verdict.high   .verdict-label { color: var(--green); }
+        .verdict.medium .verdict-label { color: var(--amber); }
+        .verdict.low    .verdict-label { color: var(--red); }
+        .verdict.unknown .verdict-label { color: var(--amber); }
+
+        .sim-badge {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 0.25rem 0.65rem;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+        }
+
+        .verdict-body {
+            margin-top: 0.9rem;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+        .verdict-body strong { color: var(--text); }
+
+        .divergence {
+            margin-top: 1rem;
+            padding-top: 0.9rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .divergence h4 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--amber);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .divergence ul {
+            list-style: none;
+            padding: 0;
+        }
+        .divergence li {
+            position: relative;
+            padding-left: 1rem;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 0.3rem;
+        }
+        .divergence li::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            color: var(--border);
+        }
+
+        .meta-row {
+            display: flex;
+            gap: 1.2rem;
+            margin-top: 0.9rem;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+        }
+        .meta-row span { font-family: var(--mono); }
+
+        /* ---- Retrieval results ---- */
+        .retrieval-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+        .retrieval-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.1rem;
+            animation: fadeSlide 0.3s ease-out both;
+        }
+        .retrieval-item:nth-child(1) { animation-delay: 0.05s; }
+        .retrieval-item:nth-child(2) { animation-delay: 0.1s; }
+        .retrieval-item:nth-child(3) { animation-delay: 0.15s; }
+        .retrieval-item:nth-child(4) { animation-delay: 0.2s; }
+        .retrieval-item:nth-child(5) { animation-delay: 0.25s; }
+
+        .retrieval-rank {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent);
+            background: var(--accent-glow);
+            border-radius: 6px;
+            padding: 0.2rem 0.55rem;
+            flex-shrink: 0;
+            margin-top: 0.15rem;
+        }
+        .retrieval-body { flex: 1; min-width: 0; }
+        .retrieval-body .name {
+            font-weight: 600;
+            font-size: 0.92rem;
+            color: #fff;
+        }
+        .retrieval-body .model-id {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 0.15rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .retrieval-body .text-preview {
+            font-family: var(--mono);
+            font-size: 0.76rem;
+            color: var(--text-dim);
+            margin-top: 0.4rem;
+            line-height: 1.5;
+            max-height: 4.5em;
+            overflow: hidden;
+        }
+        .retrieval-sim {
+            font-family: var(--mono);
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--green);
+            flex-shrink: 0;
+        }
+
+        /* ---- Examples ---- */
+        .examples {
+            margin-top: 1.2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .examples summary {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            cursor: pointer;
+            user-select: none;
+        }
+        .examples summary:hover { color: var(--text); }
+        .example-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+            padding: 0.8rem;
+            background: var(--surface);
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .example-pair:hover { border-color: var(--border-focus); }
+        .example-pair .ex-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.3rem;
+        }
+        .example-pair pre {
+            font-family: var(--mono);
+            font-size: 0.74rem;
+            color: var(--text-dim);
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+        .example-badge {
+            grid-column: 1 / -1;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            width: fit-content;
+        }
+        .example-badge.pos { background: var(--green-dim); color: var(--green); }
+        .example-badge.neg { background: var(--red-dim); color: var(--red); }
+
+        /* ---- Loader ---- */
+        .spinner {
+            width: 28px; height: 28px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-box {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        .loading-box p { margin-top: 0.6rem; }
+
+        /* ---- Footer ---- */
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            font-size: 0.78rem;
+            color: #3a3f52;
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <!-- Header -->
+    <header>
+        <h1><span>ModelEquiv</span></h1>
+        <p>Hybrid Contrastive Learning + LLM for Ecore Meta-Model Semantic Correspondence</p>
+    </header>
+
+    <!-- Pipeline visualization -->
+    <div class="pipeline">
+        <div class="step"><div class="dot"></div>Ecore Parsing</div>
+        <span class="arrow">→</span>
+        <div class="step"><div class="dot"></div>Text SimCLR</div>
+        <span class="arrow">→</span>
+        <div class="step"><div class="dot"></div>Graph GNN</div>
+        <span class="arrow">→</span>
+        <div class="step"><div class="dot"></div>Gated Fusion</div>
+        <span class="arrow">→</span>
+        <div class="step"><div class="dot"></div>LLM Re-rank</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="active" onclick="switchTab('compare')">Compare Pair</button>
+        <button onclick="switchTab('retrieve')">Search Corpus</button>
+    </div>
+
+    <!-- Tab 1: Compare -->
+    <div id="tab-compare" class="tab-content active">
+        <div class="card">
+            <div class="pair-grid">
+                <div class="input-group">
+                    <label>Class A</label>
+                    <textarea id="inputA" placeholder="Class: Family
+Attributes: address (EString)
+References: members -> Person [0..*] (Composition)"></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Class B</label>
+                    <textarea id="inputB" placeholder="Class: Household
+Attributes: location (EString)
+References: residents -> Individual [0..*] (Composition)"></textarea>
+                </div>
+            </div>
+            <button class="btn" id="btnCompare" onclick="doCompare()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>
+                Compare Classes
+            </button>
+            <div id="compareResults" class="results"></div>
+
+            <!-- Example pairs -->
+            <div class="examples">
+                <details>
+                    <summary>Load example pairs</summary>
+                    <div class="example-pair" onclick="loadExample(0)">
+                        <span class="example-badge pos">Expected: High Correspondence</span>
+                        <div><div class="ex-label">Class A</div><pre>Class: Family
+Attributes: address (EString)
+References: members -> Person [0..*] (Composition)</pre></div>
+                        <div><div class="ex-label">Class B</div><pre>Class: Household
+Attributes: location (EString)
+References: residents -> Individual [0..*] (Composition)</pre></div>
+                    </div>
+                    <div class="example-pair" onclick="loadExample(1)">
+                        <span class="example-badge neg">Expected: Low Correspondence</span>
+                        <div><div class="ex-label">Class A</div><pre>Class: Person
+Attributes: name (EString)
+References: parent -> Person [0..1]</pre></div>
+                        <div><div class="ex-label">Class B</div><pre>Class: Employee
+Attributes: loginID (EString)
+References: manager -> Employee [0..1]</pre></div>
+                    </div>
+                    <div class="example-pair" onclick="loadExample(2)">
+                        <span class="example-badge neg">Expected: No Correspondence</span>
+                        <div><div class="ex-label">Class A</div><pre>Class: Family
+Attributes: address (EString)
+References: members -> Person [0..*] (Composition)</pre></div>
+                        <div><div class="ex-label">Class B</div><pre>Class: IndustrialMachine
+Attributes: machineID (EString), powerRating (EFloat), installationDate (EDate)
+References: maintenanceLog -> LogEntry [0..*]</pre></div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: Retrieve -->
+    <div id="tab-retrieve" class="tab-content">
+        <div class="card">
+            <div class="input-group">
+                <label>Query Class Description</label>
+                <div class="search-row">
+                    <textarea id="inputQuery" placeholder="Class: Person
+Attributes: name (EString), age (EInt)
+References: friends -> Person [Association]"></textarea>
+                </div>
+            </div>
+            <button class="btn" id="btnRetrieve" onclick="doRetrieve()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                Search Corpus ({{ corpus_size }} elements)
+            </button>
+            <div id="retrieveResults" class="results"></div>
+        </div>
+    </div>
+
+    <footer>
+        ModelEquiv &middot; SimCLR + GNN + LLM pipeline &middot;
+        Mode: <strong>{{ 'SimCLR + LLM' if has_llm else 'SimCLR only' }}</strong>
+    </footer>
+
+</div>
+
+<script>
+const EXAMPLES = [
+    {
+        a: "Class: Family\nAttributes: address (EString)\nReferences: members -> Person [0..*] (Composition)",
+        b: "Class: Household\nAttributes: location (EString)\nReferences: residents -> Individual [0..*] (Composition)"
+    },
+    {
+        a: "Class: Person\nAttributes: name (EString)\nReferences: parent -> Person [0..1]",
+        b: "Class: Employee\nAttributes: loginID (EString)\nReferences: manager -> Employee [0..1]"
+    },
+    {
+        a: "Class: Family\nAttributes: address (EString)\nReferences: members -> Person [0..*] (Composition)",
+        b: "Class: IndustrialMachine\nAttributes: machineID (EString), powerRating (EFloat), installationDate (EDate)\nReferences: maintenanceLog -> LogEntry [0..*]"
+    },
+];
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+}
+
+function loadExample(idx) {
+    document.getElementById('inputA').value = EXAMPLES[idx].a;
+    document.getElementById('inputB').value = EXAMPLES[idx].b;
+}
+
+function showLoader(targetId, msg) {
+    document.getElementById(targetId).innerHTML =
+        `<div class="loading-box"><div class="spinner"></div><p>${msg}</p></div>`;
+}
+
+async function doCompare() {
+    const textA = document.getElementById('inputA').value.trim();
+    const textB = document.getElementById('inputB').value.trim();
+    if (!textA || !textB) { alert('Provide both Class A and Class B.'); return; }
+
+    const btn = document.getElementById('btnCompare');
+    btn.disabled = true;
+    showLoader('compareResults', 'Computing structural similarity and semantic verification…');
+
+    try {
+        const res = await fetch('/compare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ textA, textB })
+        });
+        const data = await res.json();
+        if (data.error) { throw new Error(data.error); }
+        renderCompare(data);
+    } catch (e) {
+        document.getElementById('compareResults').innerHTML =
+            `<div class="verdict unknown"><div class="verdict-label">Error</div><div class="verdict-body">${e.message}</div></div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function renderCompare(data) {
+    const structural = data.structural_similarity;
+    const semantic = data.semantic_similarity;
+    const combined = data.combined_score;
+    const combinedPct = (combined * 100).toFixed(1);
+
+    const cls = combined >= 0.6 ? 'high' : combined >= 0.35 ? 'medium' : 'low';
+    const label = combined >= 0.6 ? 'Strong Correspondence' : combined >= 0.35 ? 'Partial Correspondence' : 'Weak / No Correspondence';
+
+    const structPct = (structural * 100).toFixed(1);
+    const semPct = semantic != null ? (semantic * 100).toFixed(1) + '%' : 'N/A';
+
+    document.getElementById('compareResults').innerHTML = `
+        <div class="verdict ${cls}">
+            <div class="verdict-header">
+                <div class="verdict-label">${label}</div>
+                <div class="sim-badge">${combinedPct}% combined</div>
+            </div>
+            <div class="verdict-body">
+                <strong>Reasoning:</strong> ${data.reasoning || '\u2014'}
+            </div>
+            <div class="meta-row" style="margin-top:1rem">
+                <div>Structural (SimCLR): <span>${structPct}%</span></div>
+                <div>Semantic (LLM): <span>${semPct}</span></div>
+                <div>Mode: <span>${data.mode}</span></div>
+                <div>Latency: <span>${data.inference_time}s</span></div>
+            </div>
+        </div>`;
+}
+
+async function doRetrieve() {
+    const query = document.getElementById('inputQuery').value.trim();
+    if (!query) { alert('Enter a query class description.'); return; }
+
+    const btn = document.getElementById('btnRetrieve');
+    btn.disabled = true;
+    showLoader('retrieveResults', 'Searching corpus…');
+
+    try {
+        const res = await fetch('/retrieve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, top_k: 5 })
+        });
+        const data = await res.json();
+        if (data.error) { throw new Error(data.error); }
+        renderRetrieve(data);
+    } catch (e) {
+        document.getElementById('retrieveResults').innerHTML =
+            `<div class="verdict unknown"><div class="verdict-label">Error</div><div class="verdict-body">${e.message}</div></div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function renderRetrieve(data) {
+    if (!data.results || data.results.length === 0) {
+        document.getElementById('retrieveResults').innerHTML =
+            `<div class="verdict unknown"><div class="verdict-label">No results</div></div>`;
+        return;
+    }
+
+    const items = data.results.map((r, i) => {
+        const simColor = r.similarity > 0.8 ? 'var(--green)' :
+                         r.similarity > 0.5 ? 'var(--amber)' : 'var(--text-dim)';
+        return `
+        <div class="retrieval-item">
+            <div class="retrieval-rank">#${i + 1}</div>
+            <div class="retrieval-body">
+                <div class="name">${r.class_name}</div>
+                <div class="model-id">${r.model_id}</div>
+                <div class="text-preview">${r.text}</div>
+            </div>
+            <div class="retrieval-sim" style="color:${simColor}">${(r.similarity * 100).toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('retrieveResults').innerHTML = `
+        <div class="meta-row" style="margin-bottom:0.8rem">
+            <div>Corpus: <span>${data.corpus_size} elements</span></div>
+            <div>Latency: <span>${data.inference_time}s</span></div>
+        </div>
+        <div class="retrieval-list">${items}</div>`;
+}
+</script>
+</body>
+</html>

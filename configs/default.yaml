@@ -1,0 +1,81 @@
+seed: 42
+
+data:
+  structured_json: "data/structured_ecore.json"
+  processed_json: "data/processed_ecore.json"
+  graphs_pkl: "data/graphs.pkl"
+  ground_truth: "data/ground_truth.json"
+  modelset_dir: "modelset"
+  min_occurrences_per_category: 5
+
+text_simclr:
+  encoder_name: "all-MiniLM-L6-v2"
+  embedding_dim: 384
+  hidden_dim: 512
+  projection_dim: 256
+  batch_size: 64
+  epochs: 15
+  learning_rate: 0.0003
+  weight_decay: 0.00001
+  temperature: 0.1
+  warmup_epochs: 2
+  model_out: "checkpoints/text_simclr_head.pth"
+
+graph_simclr:
+  node_feature_dim: 384
+  hidden_dim: 128
+  projection_dim: 128
+  num_gnn_layers: 3
+  batch_size: 32
+  epochs: 15
+  learning_rate: 0.001
+  weight_decay: 0.00001
+  temperature: 0.1
+  dropout: 0.3
+  edge_drop_rate: 0.2
+  feature_mask_rate: 0.2
+  model_out: "checkpoints/graph_simclr.pth"
+
+fusion:
+  text_dim: 256
+  graph_dim: 128
+  fused_dim: 256
+  gate_hidden: 128
+  batch_size: 64
+  epochs: 10
+  learning_rate: 0.0005
+  temperature: 0.1
+  model_out: "checkpoints/fusion_model.pth"
+
+augmentations:
+  case_variation_prob: 0.2
+  rename_elements_prob: 0.3
+  shuffle_lists_prob: 0.3
+  delete_token_prob: 0.1
+  crop_prob: 0.1
+  synonym_replace_prob: 0.2
+  type_generalize_prob: 0.2
+  drop_optional_prob: 0.15
+
+ground_truth:
+  num_positive_pairs: 2000
+  num_hard_negatives: 2000
+  num_easy_negatives: 1000
+  transformation_types:
+    - rename
+    - reorder
+    - type_abstract
+    - add_optional
+    - flatten_inherit
+
+llm:
+  model_id: "gpt-4o-mini"
+  max_new_tokens: 200
+  top_k_verify: 5
+  few_shot_examples: 3
+
+evaluation:
+  k_values: [1, 3, 5, 10]
+  test_split: 0.2
+  val_split: 0.1
+  num_seeds: 3
