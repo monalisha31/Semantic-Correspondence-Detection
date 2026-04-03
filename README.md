@@ -3,8 +3,6 @@
 This repository contains the implementation for the paper:
 
 > **Detecting Semantic Correspondences in Ecore Models via Contrastive Learning and LLM-based Approach**
-> Monalisha Ojha, Shilpi Gupta, Rahul Sharma
-> LLM4SE 2026: Workshop on Large Language Models For Generative Software Engineering
 
 ## Overview
 
@@ -45,9 +43,8 @@ paper_code/
 │   └── index.html                  # Web UI
 ├── data/                           # Dataset files (not included, see below)
 ├── checkpoints/                    # Trained model weights (generated during training)
-├── requirements.txt
-├── .env.example                    # Template for API keys
-└── .gitignore
+|__ requirements.txt
+
 ```
 
 ## Setup
@@ -84,11 +81,11 @@ This project uses the [ModelSet](https://github.com/modelset/modelset-dataset) r
 
 ### 3. API Key (for LLM verification)
 
-Copy the example env file and add your OpenAI API key:
+Add your OpenAI API key:
 
 ```bash
-cp .env.example .env
-# Edit .env and set: OPENAI_API_KEY=sk-your-key-here
+
+# Create .env and set: OPENAI_API_KEY=sk-your-key-here
 ```
 
 The LLM stage is optional. The pipeline works without it in SimCLR-only mode.
@@ -169,17 +166,5 @@ On the full ModelSet benchmark (89,128 EClasses from 3,589 metamodels):
 | LLM-only | 0.990 | 0.950 | 0.969 | 0.873 |
 | **Hybrid** | **0.961** | **0.990** | **0.975** | **0.886** |
 
-## Citation
 
-```bibtex
-@inproceedings{ojha2026modelequiv,
-  title={Detecting Semantic Correspondences in Ecore Models via Contrastive Learning and LLM-based Approach},
-  author={Ojha, Monalisha and Gupta, Shilpi and Sharma, Rahul},
-  booktitle={LLM4SE 2026: Workshop on Large Language Models For Generative Software Engineering},
-  year={2026}
-}
-```
 
-## License
-
-This project is licensed under CC BY 4.0.
